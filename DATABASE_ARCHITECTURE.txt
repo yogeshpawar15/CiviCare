@@ -1,0 +1,241 @@
+# Civicare Database - Visual Architecture
+
+```
+╔════════════════════════════════════════════════════════════════════════════╗
+║                    CIVICARE DATABASE ARCHITECTURE                          ║
+║                         17 Tables | 100% Complete                          ║
+╚════════════════════════════════════════════════════════════════════════════╝
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ CORE ENTITIES (Foundation Layer)                                            │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                             │
+│  ┌──────────────┐    ┌──────────────┐                                       │
+│  │   USERS      │◄──┤DEPARTMENTS   │                                        │
+│  ├──────────────┤    └──────────────┘                                       │
+│  │ id (PK)      │                                                           │
+│  │ username     │                                                           │
+│  │ email        │    Types: citizen, staff, admin, super_admin              │
+│  │ password     │                                                           │
+│  │ full_name    │    Used by: ALL modules                                   │
+│  │ role         │                                                           │
+│  │ department   │────┐                                                      │
+│  │ is_active    │    │                                                      │
+│  │ created_by   │    │                                                      │
+│  │ updated_by   │    │                                                      │
+│  │ deleted_at   │    │                                                      │
+│  └──────────────┘    │                                                      │
+│                      │                                                      │
+│                      ▼                                                      │
+│                  ┌──────────────┐                                           │
+│                  │COMPLAINTS    │                                           │
+│                  ├──────────────┤                                           │
+│                  │ id (PK)      │                                           │
+│                  │ tracking_id  │                                           │
+│                  │ user_id      │◄──────────────────────┐                   │
+│                  │ dept_id      │                       │ (citizen)         │
+│                  │ title        │                       │                   │
+│                  │ description  │                       │                   │
+│                  │ status       │ ──────────────────┬─┐ │                   │
+│                  │ priority     │ 8 States:         │ │ │                   │
+│                  │ assigned_to  │ pending,          │ │ │                   │
+│                  │ validated_by │ validated,        │ │ │                   │
+│                  │ resolved_by  │ rejected,         │ │ │                   │
+│                  │ escalated_by │ assigned,         │ │ │                   │
+│                  │ & more...    │ in_progress,      │ │ │                   │
+│                  └──────────────┘ resolved,         │ │ │                   │
+│                                   escalated,        │ │ │                   │
+│                                   closed            │ │ │                   │
+│                                                     │ │ │                   │
+│                      ┌──────────────────────────────┘ │ │                   │
+│                      │                                │ │                   │
+└──────────────────────┼────────────────────────────────┼─┼───────────────────┘
+                       │                                │ │
+                       ▼                                │ │
+┌───────────────────────────────────────────────────────┼─┼───────────────────┐
+│ COMPLAINT LIFECYCLE (Related Tables)                 │ │                    │
+├──────────────────────────────────────────────────── ─┼─┼────────────────────┤
+│                                                      │ │                    │
+│  ┌─────────────────────┐       ┌────────────────┐    │ │                    │
+│  │COMPLAINT_UPDATES    │       │ ATTACHMENTS    │    │ │                    │
+│  ├─────────────────────┤       ├────────────────┤    │ │                    │
+│  │ id, complaint_id◄───┼───┐   │ id             │    │ │                    │
+│  │ user_id         ├───┼──┐├──-┤ complaint_id◄──┼──--┴─┘                    │
+│  │ old_status      │   │  ││   │ file_name      │                           │
+│  │ new_status      │   │  ││   │ file_path      │    Status Track           │
+│  │ remarks         │   │  ││   │ uploaded_by    │    & History              │
+│  │ created_at      │   │  ││   └────────────────┘                           │
+│  └─────────────────────┘  ││                                               │
+│                           ││  ┌─────────────────┐                          │
+│                           ││  │COMPLAINT_COMMENTS│                         │
+│                           ││  ├─────────────────┤                          │
+│                           ││  │ id              │                          │
+│                           ││  │ complaint_id◄───┼──┐                       │
+│                           ││  │ user_id         │  │                       │
+│                           ││  │ comment         │  │  Remarks &            │
+│                           ││  │ is_internal     │  │  Discussion           │
+│                           ││  │ created_at      │  │                       │
+│                           ││  └─────────────────┘  │                       │
+│                           ││                       │                       │
+│                           ││  ┌──────────────────┐ │                       │
+│                            └──┤COMPLAINT_FEEDBACK│ │                        │
+│                               ├──────────────────┤ │                        │
+│                               │ id               │ │                        │
+│                               │ complaint_id◄────┼─┘                        │
+│                               │ user_id          │                          │
+│                               │ rating (1-5)     │  Citizen Feedback        │
+│                               │ feedback_text    │  & Ratings               │
+│                               │ submitted_at     │                          │
+│                               └──────────────────┘                          │
+│                                                                             │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ NOTIFICATION SYSTEM (Real-time & Queued)                                    │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                              │
+│  ┌──────────────────┐                                                       │
+│  │NOTIFICATIONS     │                                                       │
+│  ├──────────────────┤                                                       │
+│  │ id               │  Types: system, complaint, dept, announcement         │
+│  │ user_id          │  For all users: citizens, staff, admin               │
+│  │ title            │  Features: mark read, delete, filter                 │
+│  │ message          │                                                       │
+│  │ notification_type│                                                       │
+│  │ is_read          │                                                       │
+│  │ created_at       │                                                       │
+│  └──────────────────┘                                                       │
+│          │                                                                  │
+│          ├─────────────────────┬────────────────────┐                      │
+│          ▼                     ▼                    ▼                       │
+│  ┌──────────────┐      ┌──────────────┐    ┌──────────────┐               │
+│  │EMAIL_QUEUE   │      │ SMS_QUEUE    │    │ANNOUNCEMENTS │               │
+│  ├──────────────┤      ├──────────────┤    ├──────────────┤               │
+│  │ id           │      │ id           │    │ id           │               │
+│  │ recipient    │      │ recipient    │    │ title        │               │
+│  │ subject      │      │ message      │    │ content      │               │
+│  │ body         │      │ status       │    │ priority     │               │
+│  │ status       │      │ attempts     │    │ is_active    │               │
+│  │ attempts     │      │ error_msg    │    │ created_by   │               │
+│  │ error_msg    │      │ created_at   │    │ expires_at   │               │
+│  │ created_at   │      │ sent_at      │    │ created_at   │               │
+│  │ sent_at      │      └──────────────┘    └──────────────┘               │
+│  └──────────────┘                                                           │
+│                                                                              │
+│        Async Email Processing      SMS Processing    Public Announcements   │
+│                                                                              │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ ADMIN & ORGANIZATION (Configuration & Management)                           │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                              │
+│  ┌──────────────────┐       ┌──────────────────────┐                       │
+│  │DEPARTMENTS       │       │ DEPT_ANNOUNCEMENTS   │                       │
+│  ├──────────────────┤       ├──────────────────────┤                       │
+│  │ id               │       │ id                   │                       │
+│  │ name             │◄──────┤ department_id        │                       │
+│  │ description      │       │ title, content       │                       │
+│  │ is_active        │       │ priority             │                       │
+│  │ created_at       │       │ created_by           │                       │
+│  │ updated_at       │       │ expires_at           │                       │
+│  └──────────────────┘       └──────────────────────┘                       │
+│           │                                                                 │
+│           │                  ┌──────────────────────┐                      │
+│           │                  │PERFORMANCE_METRICS   │                      │
+│           └─────────────────►├──────────────────────┤                      │
+│                              │ id                   │                      │
+│  ┌──────────────────┐        │ metric_date          │                      │
+│  │ SETTINGS         │        │ department_id        │                      │
+│  ├──────────────────┤        │ total_complaints     │                      │
+│  │ id               │        │ resolved_complaints  │                      │
+│  │ site_name        │        │ pending_complaints   │                      │
+│  │ site_email       │        │ avg_resolution_time  │                      │
+│  │ site_phone       │        │ citizen_satisfaction │                      │
+│  │ enable_features  │        │ updated_at           │                      │
+│  │ smtp_config      │        └──────────────────────┘                      │
+│  │ notifications    │                                                      │
+│  │ complaint_settings
+│  │ created_at       │        Reports & Analytics                           │
+│  │ updated_at       │        Department Performance                        │
+│  └──────────────────┘        Resolution Statistics                        │
+│                              Citizen Satisfaction                         │
+│        System Configuration                                                │
+│        Email/SMS Setup                                                     │
+│                                                                              │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ AUDIT & LOGGING (Security & Compliance)                                     │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                              │
+│  ┌──────────────────┐   ┌──────────────────┐   ┌──────────────────┐       │
+│  │SYSTEM_LOGS       │   │ USER_LOGS        │   │ AUDIT_LOGS       │       │
+│  ├──────────────────┤   ├──────────────────┤   ├──────────────────┤       │
+│  │ id               │   │ id               │   │ id               │       │
+│  │ user_id          │   │ user_id          │   │ user_id          │       │
+│  │ action_type      │   │ action           │   │ action           │       │
+│  │ description      │   │ details          │   │ entity_type      │       │
+│  │ ip_address       │   │ ip_address       │   │ entity_id        │       │
+│  │ user_agent       │   │ user_agent       │   │ old_values(JSON) │       │
+│  │ created_at       │   │ created_at       │   │ new_values(JSON) │       │
+│  └──────────────────┘   └──────────────────┘   │ created_at       │       │
+│                                                 └──────────────────┘       │
+│         Admin Actions        User Activity           Change Tracking        │
+│         Staff Actions        Login/Logout           Data Modifications      │
+│         System Events        Operations             Full Audit Trail        │
+│                                                                              │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+╔════════════════════════════════════════════════════════════════════════════╗
+║                            TABLE COUNT: 17 TOTAL                           ║
+╠════════════════════════════════════════════════════════════════════════════╣
+║ Core (create_tables.php):      8 tables                                    ║
+║ Extended (update_tables.php):  9 tables                                    ║
+║ ────────────────────────────────────────                                   ║
+║ Total:                         17 tables ✅                                ║
+╚════════════════════════════════════════════════════════════════════════════╝
+
+DATA FLOW:
+
+  CITIZEN                          STAFF                        ADMIN
+   │                               │                             │
+   ├─► Register (users)            ├─► Login (users)             ├─► Login (users)
+   ├─► File Complaint              ├─► View Assigned Complaints  ├─► View All Data
+   │   (complaints)                │   (complaints)              ├─► Manage Users
+   ├─► Add Evidence                ├─► Update Status            ├─► Manage Depts
+   │   (attachments)               │   (complaint_updates)       ├─► Settings
+   ├─► Add Comments                ├─► Add Remarks              ├─► Reports
+   │   (complaint_comments)        │   (complaint_comments)      ├─► Audit Logs
+   ├─► Get Notifications           ├─► Get Notifications        └─► Announcements
+   │   (notifications)             │   (notifications)
+   ├─► Provide Feedback            ├─► Track Performance
+   │   (complaint_feedback)        │   (performance_metrics)
+   └─► Track Status                └─► Log Activities
+       (complaint_updates)             (user_logs)
+
+═══════════════════════════════════════════════════════════════════════════════
+
+FEATURES COVERAGE:
+
+✅ User Management (Registration, Auth, Profiles, Roles)
+✅ Complaint Lifecycle (File → Validate → Assign → Resolve → Close)
+✅ 8 Status States (pending, validated, rejected, assigned, in_progress, 
+                   resolved, escalated, closed)
+✅ Priority Management (low, medium, high, urgent)
+✅ Department Management (Create, Manage, Track Performance)
+✅ Staff Assignment (By department, performance tracking)
+✅ Escalation Support (Track escalations with reasons)
+✅ Notifications (Real-time + Email/SMS queues)
+✅ File Management (Evidence/Attachments)
+✅ Comments System (Internal + Public)
+✅ Feedback Collection (Citizen ratings & reviews)
+✅ System Settings (SMTP, Notifications, Complaint Rules)
+✅ Audit Logging (Complete change tracking)
+✅ Activity Logging (User actions, login/logout)
+✅ Reports & Analytics (Performance metrics, satisfaction)
+✅ Announcements (System-wide + Department-specific)
+
+═══════════════════════════════════════════════════════════════════════════════
+
+STATUS: 🟢 PRODUCTION READY - All 17 tables in place and fully integrated

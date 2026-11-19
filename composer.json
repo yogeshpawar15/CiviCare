@@ -1,0 +1,14 @@
+{
+    "name": "civicare/app",
+    "description": "Civicare",
+    "type": "project",
+    "authors": [
+        {
+            "name": "pramod13071626",
+            "email": "othersites141@gmail.com"
+        }
+    ],
+    "require": {
+        "tecnickcom/tcpdf": "^6.10"
+    }
+}
